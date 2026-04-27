@@ -93,9 +93,12 @@ class SlackContextProvider(ContextProvider):
 
     def instructions(self) -> str:
         if self.mode == ContextMode.tools:
-            # SlackTools auto-injects detailed instructions via add_instructions=True
-            # No need to duplicate here — let the toolkit guide the LLM
-            return ""
+            return (
+                f"`{self.name}`: `search_workspace` for topic/catch-up queries across the workspace; "
+                "`get_channel_history` for latest messages in a known channel; `get_thread(channel_id, ts)` "
+                "to expand a thread; `get_channel_info` / `get_user_info` to resolve names. "
+                "mode=tools exposes the read toolset only; writes require mode=default (two-tool surface)."
+            )
         return (
             f"`{self.name}`: call `{self.query_tool_name}(question)` to read Slack, "
             f"or `{self.update_tool_name}(instruction)` to post a message."
