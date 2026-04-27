@@ -29,6 +29,7 @@ from __future__ import annotations
 import asyncio
 
 from agno.agent import Agent
+from agno.context.mode import ContextMode
 from agno.context.slack import SlackContextProvider
 from agno.context.web import ExaBackend, WebContextProvider
 from agno.models.openai import OpenAIResponses
@@ -37,7 +38,8 @@ from agno.models.openai import OpenAIResponses
 provider_model = OpenAIResponses(id="gpt-5.4-mini")
 
 web = WebContextProvider(backend=ExaBackend(), model=provider_model)
-slack = SlackContextProvider(model=provider_model)
+# mode=tools exposes SlackTools directly — SlackTools auto-injects its own instructions
+slack = SlackContextProvider(model=provider_model, mode=ContextMode.tools)
 
 agent = Agent(
     model=OpenAIResponses(id="gpt-5.4"),
@@ -54,8 +56,8 @@ if __name__ == "__main__":
     prompt = (
         "I'm prepping a short briefing for our weekly engineering sync. "
         "Do this:\n"
-        "  1. Pull the 10 most recent messages from the #agents Slack "
-        "channel and identify 2 distinct topics under discussion.\n"
+        "  1. Use get_channel_history(channel='C0AHK2V7P4P', limit=10) to pull "
+        "messages from #slack-apps-testing and identify 2 distinct topics.\n"
         "  2. For each topic, find one current (last ~month) article, "
         "release, or reference online that would be useful to link.\n"
         "\n"
