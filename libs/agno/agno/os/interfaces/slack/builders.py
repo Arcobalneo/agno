@@ -6,69 +6,20 @@ from typing import Any, Callable, Dict, List, Optional
 
 from slack_sdk.models.blocks import (
     ActionsBlock as Actions,
-)
-from slack_sdk.models.blocks import (
     CheckboxesElement as Checkboxes,
-)
-from slack_sdk.models.blocks import (
     ConfirmObject as ConfirmDialog,
-)
-from slack_sdk.models.blocks import (
     ContextBlock as Context,
-)
-from slack_sdk.models.blocks import (
     DividerBlock as Divider,
-)
-from slack_sdk.models.blocks import (
     InputBlock,
-)
-from slack_sdk.models.blocks import (
     PlainTextInputElement as PlainTextInput,
-)
-from slack_sdk.models.blocks import (
     StaticSelectElement as StaticSelect,
 )
 from slack_sdk.models.blocks.basic_components import (
     MarkdownTextObject as Markdown,
-)
-from slack_sdk.models.blocks.basic_components import (
     Option,
-)
-from slack_sdk.models.blocks.basic_components import (
     PlainTextObject as PlainText,
 )
-from slack_sdk.models.blocks.block_elements import ButtonElement as Button
-from slack_sdk.models.blocks.block_elements import ImageElement
-
-MAX_MESSAGE_BLOCKS = 48
-
-
-@dataclass
-class Card:
-    """Slack card block for HITL approval prompts. Not in SDK yet."""
-
-    actions: List[Button]
-    icon: Optional[ImageElement] = None
-    title: Optional[PlainText | Markdown] = None
-    subtitle: Optional[PlainText | Markdown] = None
-    block_id: Optional[str] = None
-    type: str = "card"
-
-    def to_dict(self) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
-            "type": self.type,
-            "actions": [a.to_dict() for a in self.actions],
-        }
-        if self.icon:
-            result["icon"] = self.icon.to_dict()
-        if self.title:
-            result["title"] = self.title.to_dict()
-        if self.subtitle:
-            result["subtitle"] = self.subtitle.to_dict()
-        if self.block_id:
-            result["block_id"] = self.block_id
-        return result
-
+from slack_sdk.models.blocks.block_elements import ButtonElement as Button, ImageElement
 
 from agno.os.interfaces.slack.types import (
     ACTION_EXTERNAL_RESULT,
@@ -87,6 +38,39 @@ from agno.os.interfaces.slack.types import (
     row_block_id,
 )
 from agno.run.requirement import RunRequirement
+
+MAX_MESSAGE_BLOCKS = 48
+
+
+@dataclass
+class Card:
+    """Slack card block for HITL approval prompts. Not in SDK yet."""
+
+    actions: List[Button]
+    icon: Optional[ImageElement] = None
+    title: Optional[PlainText | Markdown] = None
+    subtitle: Optional[PlainText | Markdown] = None
+    block_id: Optional[str] = None
+
+    @property
+    def type(self) -> str:
+        return "card"
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "type": self.type,
+            "actions": [a.to_dict() for a in self.actions],
+        }
+        if self.icon:
+            result["icon"] = self.icon.to_dict()
+        if self.title:
+            result["title"] = self.title.to_dict()
+        if self.subtitle:
+            result["subtitle"] = self.subtitle.to_dict()
+        if self.block_id:
+            result["block_id"] = self.block_id
+        return result
+
 
 ARG_VALUE_MAX = 120
 
@@ -129,7 +113,7 @@ def _subtitle_from_args(args: Dict[str, Any]) -> str:
     parts: List[str] = []
     for key, value in (args or {}).items():
         rendered = render_arg_value(value)
-        if len(rendered) > 40:
+        if len(rendered) > 40:  # Slack Card subtitle becomes unreadable past ~40 chars per value
             rendered = rendered[:37] + "…"
         parts.append(f"{key}: `{rendered}`")
     return " · ".join(parts) if parts else "_(no arguments)_"
@@ -159,12 +143,13 @@ def _build_confirm_dialogs(name: str, args: Dict[str, Any]) -> tuple[ConfirmDial
     running = 0
     for key, value in (args or {}).items():
         line = f"• {key}: `{render_arg_value(value)}`"
-        if running + len(line) > 180:
+        if running + len(line) > 180:  # ConfirmDialog text is 300 max; leave room for footer
             bullets.append(f"_… {len(args) - len(bullets)} more_")
             break
         bullets.append(line)
         running += len(line)
     args_block = "\n".join(bullets) if bullets else "_(no arguments)_"
+    # Slack ConfirmDialog: text max 300 chars, title max 100 chars
     approve_text = (f"{args_block}\n\n_Approving will resume the agent run._")[:299]
     deny_text = (f"{args_block}\n\n_The agent will continue without running this tool._")[:299]
     approve = ConfirmDialog(
@@ -213,7 +198,7 @@ def _build_input_field(req_id: str, ui_field: Any) -> InputBlock:
             action_id=f"{ACTION_INPUT_FIELD_PREFIX}{name}",
             placeholder=PlainText(text=f"Enter {name}"),
             initial_value=initial_value,
-            multiline=multiline if multiline else None,
+            multiline=multiline or None,
         )
 
     return InputBlock(
@@ -448,7 +433,7 @@ def response_blocks(
             break
 
     body_text = "\n\n".join(body_lines)
-    if len(body_text) > 200:
+    if len(body_text) > 200:  # Slack Card body renders poorly past ~200 chars
         body_text = body_text[:197] + "..."
 
     submission_card: Dict[str, Any] = {

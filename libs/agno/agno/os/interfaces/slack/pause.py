@@ -83,13 +83,7 @@ async def post_pause_card(
     thread_ts: str,
     awaiting_ts: Optional[str] = None,
 ) -> Optional[str]:
-    """Post the Card block as a separate message in the thread.
-
-    Runs independently of AsyncChatStream because chat_appendStream does
-    not accept Block Kit payloads. The decision handler later mutates
-    this message in place via chat.update to swap the buttons for a
-    permanent decision chip.
-    """
+    # Separate message needed — chat_appendStream rejects Block Kit; mutated in-place by decision handler
     run_id = getattr(paused_event, "run_id", None)
     requirements = list(getattr(paused_event, "active_requirements", None) or [])
     if not run_id or not requirements:
@@ -103,7 +97,7 @@ async def post_pause_card(
                 return b.to_dict()
             if hasattr(b, "model_dump"):
                 return b.model_dump(exclude_none=True, mode="json")
-            if is_dataclass(b):
+            if is_dataclass(b) and not isinstance(b, type):
                 return asdict(b)
             raise TypeError(f"Cannot serialize block of type {type(b).__name__}")
 

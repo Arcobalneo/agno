@@ -1,20 +1,4 @@
-"""
-Slack HITL Interactions
-
-Handles Slack interaction payloads (button clicks, form submissions) for the HITL system.
-
-Flow:
-    Slack webhook POST → router.py → parse_submit_payload() → apply_decisions() → agent resumes
-
-Key functions:
-    parse_submit_payload  - Extracts decisions from Slack's nested state structure
-    apply_decisions       - Calls requirement.confirm()/reject()/provide_user_input()
-    coerce_to_type        - Converts Slack string values to schema types (int, bool, list, dict)
-    format_decision_title - Generates task card titles like "Denied: delete_file(path=/tmp)"
-
-Slack payloads have deeply nested state: payload.state.values[block_id][action_id].value
-This module handles that extraction so router.py stays focused on HTTP handling.
-"""
+"""Parse Slack interaction payloads (button clicks, form submissions) for HITL."""
 
 from __future__ import annotations
 
@@ -36,15 +20,13 @@ from agno.os.interfaces.slack.types import (
 )
 from agno.run.requirement import RunRequirement
 
+# Slack task card title truncation — longer titles wrap awkwardly in the plan block
 DECISION_TITLE_MAX = 120
+# Slack Card body renders poorly with long values; keeps single-line args readable
 DECISION_VALUE_MAX = 40
 
 SlackState = Dict[str, Dict[str, Any]]
 SlackBlocks = List[Dict[str, Any]]
-
-
-# --- Type Coercion ---
-# Slack form inputs are always strings. These convert to the schema's expected type.
 
 
 def _coerce_json(raw: str, expected: Type) -> Any:
@@ -73,10 +55,6 @@ def coerce_to_type(raw: Optional[str], target_type: Type) -> Any:
     return coercer(raw)
 
 
-# --- Slack State Extraction ---
-# Helpers to pull values from Slack's nested state structure.
-
-
 def _get_action_state(state: SlackState, block_id: str, action_id: str) -> Dict[str, Any]:
     return state.get(block_id, {}).get(action_id, {})
 
@@ -95,10 +73,6 @@ def _extract_selected_values(action_state: Dict[str, Any]) -> List[str]:
         selected = action_state.get("selected_option") or {}
         return [selected["value"]] if selected.get("value") else []
     return []
-
-
-# --- Confirmation Parsing ---
-# Confirmations store decision in block_id: "row:<req_id>:confirmation:decided:<approve|reject>"
 
 
 def _find_confirmation_decision(blocks: SlackBlocks, requirement_id: str) -> Optional[str]:
@@ -132,10 +106,6 @@ def _parse_confirmation(requirement: RunRequirement, blocks: SlackBlocks) -> Par
     )
 
 
-# --- User Input Parsing ---
-# Each field has block_id: "row:<req_id>:user_input:<field_name>"
-
-
 def _parse_user_input(
     requirement: RunRequirement,
     state: SlackState,
@@ -164,10 +134,6 @@ def _parse_user_input(
     )
 
 
-# --- User Feedback Parsing ---
-# Each question has block_id: "row:<req_id>:user_feedback:q<index>"
-
-
 def _parse_user_feedback(
     requirement: RunRequirement,
     state: SlackState,
@@ -194,10 +160,6 @@ def _parse_user_feedback(
     )
 
 
-# --- External Execution Parsing ---
-# Result field has block_id: "row:<req_id>:external_execution:result"
-
-
 def _parse_external(
     requirement: RunRequirement,
     state: SlackState,
@@ -216,9 +178,6 @@ def _parse_external(
         pause_type="external_execution",
         external_result=result or None,
     )
-
-
-# --- Main Entry Points ---
 
 
 def parse_submit_payload(
@@ -264,9 +223,6 @@ def apply_decisions(decisions: List[ParsedDecision], requirements: List[RunRequi
             requirement.provide_user_feedback(decision.feedback_selections)
         elif decision.pause_type == "external_execution" and decision.external_result is not None:
             requirement.set_external_execution_result(decision.external_result)
-
-
-# --- Decision Title Formatting ---
 
 
 def _render_value(value: Any) -> str:
