@@ -67,14 +67,8 @@ def extract_event_context(event: dict) -> Dict[str, Any]:
 
 
 def strip_bot_mention(text: str, bot_user_id: Optional[str]) -> str:
-    """Remove the bot's own @mention from message text.
-
-    Slack encodes mentions as ``<@U123>``. When a user @-mentions the bot,
-    the agent shouldn't see its own ID in the text — it just adds noise and
-    causes the model to echo back the raw mention tag.
-
-    Only strips the *bot's* mention; other users' mentions are preserved.
-    """
+    # Slack mentions are <@U123>. The agent shouldn't see its own ID — it adds
+    # noise and causes the model to echo back the raw tag. Other users preserved.
     if not bot_user_id or not text:
         return text
     import re
@@ -85,11 +79,7 @@ def strip_bot_mention(text: str, bot_user_id: Optional[str]) -> str:
 
 
 async def resolve_slack_user(async_client: Any, slack_user_id: str) -> Tuple[str, Optional[str]]:
-    """Resolve a Slack user ID to (canonical_user_id, display_name).
-
-    Returns the user's email as canonical_user_id if available, otherwise
-    falls back to the raw Slack user ID. Display name is best-effort.
-    """
+    # Returns (email or slack_id, display_name). Email preferred for cross-platform identity.
     try:
         resp = await async_client.users_info(user=slack_user_id)
         user = resp.get("user", {}) if resp else {}
@@ -109,7 +99,6 @@ async def resolve_slack_user(async_client: Any, slack_user_id: str) -> Tuple[str
 
 
 async def resolve_channel_name(async_client: Any, channel_id: str) -> Optional[str]:
-    """Resolve a Slack channel ID to its human-readable name."""
     try:
         resp = await async_client.conversations_info(channel=channel_id)
         channel = resp.get("channel", {}) if resp else {}
